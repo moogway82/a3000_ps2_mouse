@@ -1,0 +1,1452 @@
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ; $VER: 1.5 (08.07.01)
+                      00002 ; COPYRIGHT (C) 2001 RDC SOFTWARE
+                      00003 ; Distributed under GPL license - see gpl.txt
+                      00004 
+                      00005 ; This is a part of ps2m package,
+                      00006 ; you can obtain latest version at Aminet:
+                      00007 
+                      00008 ; ftp://ftp.wustl.edu/pub/aminet/hard/hack/ps2m.lha
+                      00009 ; ftp://ftp.wustl.edu/pub/aminet/hard/hack/ps2m.readme
+                      00010 
+                      00011 ; Use mpasm or gpasm to compile. Select appropriate __CONFIG line below (to set fuses).
+                      00012 
+                      00013 ; ftp://ftp.wustl.edu/pub/aminet/dev/cross/devpic.lha
+                      00014 ; ftp://ftp.wustl.edu/pub/aminet/dev/cross/devpic.readme
+                      00015 
+                      00016 
+                      00017 ; processor
+                      00018         LIST P=16F628A
+                      00019         #include <p16f628a.inc>
+                      00001         LIST
+                      00002 
+                      00003 ;==========================================================================
+                      00004 ; Build date : May 28 2014
+                      00005 ;  MPASM PIC16F628A processor include
+                      00006 ; 
+                      00007 ;  (c) Copyright 1999-2014 Microchip Technology, All rights reserved
+                      00008 ;==========================================================================
+                      00009 
+                      00386         LIST
+                      00020         #include <macros.inc>
+                      00001 addfw   macro freg
+                      00002         addwf   freg, W
+                      00003         endm
+                      00004 
+                      00005 callw   macro target, literal
+                      00006         movlw   literal
+                      00007         call    target
+                      00008         endm
+                      00009 
+                      00010 cmplf   macro literal, freg
+                      00011         movlw   literal
+                      00012         subwf   freg, W
+                      00013         endm
+                      00014 
+                      00015 comfw   macro freg
+                      00016         comf    freg, W
+                      00017         endm
+                      00018 
+                      00019 iorfw   macro freg
+                      00020         iorwf   freg, W
+                      00021         endm
+                      00022 
+                      00023 loop    macro endl, count
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00024         decfsz  count, F
+                      00025         goto    endl
+                      00026         endm
+                      00027 
+                      00028 movff   macro sfreg, dfreg
+                      00029         movf    sfreg, W
+                      00030         movwf   dfreg
+                      00031         endm
+                      00032 
+                      00033 movlf   macro literal, freg
+                      00034         movlw   literal
+                      00035         movwf   freg
+                      00036         endm
+                      00037 
+                      00038 rlfw    macro freg
+                      00039         rlf     freg, W
+                      00040         endm
+                      00041 
+                      00042 rrfw    macro freg
+                      00043         rrf     freg, W
+                      00044         endm
+                      00045 
+                      00046 ; skip if carry
+                      00047 skipc   macro
+                      00048         btfss   STATUS, C
+                      00049         endm
+                      00050 
+                      00051 ; skip if not carry
+                      00052 skipnc  macro
+                      00053         btfsc   STATUS, C
+                      00054         endm
+                      00055 
+                      00056 ; skip if not zero
+                      00057 skipnz  macro
+                      00058         btfsc   STATUS, Z
+                      00059         endm
+                      00060 
+                      00061 ; skip if zero
+                      00062 skipz   macro
+                      00063         btfss   STATUS, Z
+                      00064         endm
+                      00065 
+                      00066 sublf   macro literal, freg
+                      00067         movlw   literal
+                      00068         subwf   freg, F
+                      00069         endm
+                      00070 
+                      00071 swapfw  macro freg
+                      00072         swapf   freg, W
+                      00073         endm
+                      00074 
+                      00075 xorfw   macro freg
+                      00076         xorwf   freg, W
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00077         endm
+                      00021         radix dec
+                      00022 
+                      00023 
+                      00024 ; fuses (uncomment depending on assembler):
+                      00025         ; for use with mpasm (_CPD_OFF to disable eeprom code protection)
+2007   3F5C           00026         __CONFIG _LVP_OFF & _CPD_OFF     & _CP_OFF & _BODEN_ON & _MCLRE_OFF & _PWRTE_OFF & _WDT_ON & _IN
+                            TRC_OSC_NOCLKOUT
+                      00027         ; for use with gpasm (_DATA_CP_OFF to disable eeprom code protection)
+                      00028 ;       __CONFIG _LVP_OFF & _DATA_CP_OFF & _CP_OFF & _BODEN_ON & _MCLRE_OFF & _PWRTE_OFF & _WDT_ON & _IN
+                            TRC_OSC_NOCLKOUT
+                      00029 
+                      00030 
+                      00031 ; ---------------
+                      00032 ; switches/config
+                      00033 ; ---------------
+                      00034 
+  00000000            00035 POWER   equ     0
+  0000002E            00036 SPEED   equ     46
+                      00037 
+                      00038 ; ---------
+                      00039 ; variables
+                      00040 ; ---------
+                      00041 
+                      00042         cblock  0x20
+  00000020            00043                 memstart:0      ; pointer to start of memory
+  00000020            00044                 count
+  00000021            00045                 recvb
+  00000022            00046                 recvc
+  00000023            00047                 recvd:2
+  00000025            00048                 recvdt
+  00000026            00049                 sendata
+  00000027            00050                 sendetc
+  00000028            00051                 intw
+  00000029            00052                 ints
+  0000002A            00053                 wdtp
+  0000002B            00054                 wdtm:2
+  0000002D            00055                 temp1
+  0000002E            00056                 currbyte
+  0000002F            00057                 xdif
+  00000030            00058                 ydif
+  00000031            00059                 xdir
+  00000032            00060                 ydir
+  00000033            00061                 xspeed:2
+  00000035            00062                 yspeed:2
+  00000037            00063                 xcount
+  00000038            00064                 ycount
+  00000039            00065                 xtemp
+  0000003A            00066                 ytemp
+  0000003B            00067                 flags
+  0000003C            00068                 extflags
+                      00069 
+  0000003D            00070                 byte1
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+  0000003E            00071                 byte2
+  0000003F            00072                 byte3
+  00000040            00073                 byte4
+  00000041            00074                 zdif
+  00000042            00075                 zcount
+                      00076 
+  00000043            00077                 q0
+  00000044            00078                 q1
+  00000045            00079                 q2
+  00000046            00080                 q3
+  00000047            00081                 q4
+  00000048            00082                 mem_end         ; pointer to end of memory (+1 actually)
+                      00083         endc
+                      00084 
+                      00085 ; ---------------
+                      00086 ; bit definitions
+                      00087 ; ---------------
+                      00088 
+  00000000            00089 fpkt1   equ     0
+  00000001            00090 fpkt2   equ     1
+  00000002            00091 fpkt3   equ     2
+  00000003            00092 fbyte   equ     3
+  00000004            00093 fnores  equ     4
+  00000005            00094 fnofps  equ     5
+  00000006            00095 fon     equ     6
+  00000007            00096 fwheel  equ     7
+                      00097 
+  00000000            00098 ext200  equ     0
+  00000001            00099 extime  equ     1       ;ms "intellimouse explorer"
+  00000002            00100 extnso  equ     2       ;genius "netscroll optical"
+  00000003            00101 extnof  equ     3
+                      00102         if      POWER-1
+  00000004            00103 extbut  equ     4
+                      00104         endif
+                      00105 
+                      00106 
+0000                  00107                 org     0x00
+                      00108 ; ----------------
+                      00109 ; init PIC & mouse
+                      00110 ; ----------------
+                      00111 
+0000                  00112 start
+0000   018B           00113         clrf    INTCON
+                      00114         if      POWER
+                      00115         movlw   b'10000001'
+                      00116         else
+0001   3001           00117         movlw   b'00000001'
+                      00118         endif
+Warning[224]: Use of this instruction is not recommended.
+0002   0062           00119         option
+0003   281A           00120         goto    start_a
+                      00121 
+                      00122 
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0004                  00123                 org     0x04
+                      00124 ; -----------------
+                      00125 ; interrupt handler
+                      00126 ; -----------------
+                      00127 
+0004                  00128 int
+0004   108B           00129         bcf     INTCON,1
+0005   00A8           00130         movwf   intw
+                      00131         swapfw  STATUS
+0006   0E03               M         swapf   STATUS, W
+0007   00A9           00132         movwf   ints
+0008   1124           00133         bcf     recvd+1,2
+0009   1886           00134         btfsc   PORTB,1
+000A   1524           00135         bsf     recvd+1,2
+000B   0CA4           00136         rrf     recvd+1, F
+000C   0CA3           00137         rrf     recvd, F
+000D   16AA           00138         bsf     wdtp,5          ;clear packet bit shift watchdog
+                      00139         loop    ila,recvc
+000E   0BA2               M         decfsz  recvc, F
+000F   2815               M         goto    ila
+                      00140         movlf   11,recvc
+0010   300B               M         movlw   11
+0011   00A2               M         movwf   recvc
+0012   15BB           00141         bsf     flags,fbyte
+                      00142         movff   recvd,recvdt
+0013   0823               M         movf    recvd, W
+0014   00A5               M         movwf   recvdt
+                      00143 ila     swapfw  ints
+0015   0E29               M         swapf   ints, W
+0016   0083           00144         movwf   STATUS
+0017   0EA8           00145         swapf   intw, F
+                      00146         swapfw  intw
+0018   0E28               M         swapf   intw, W
+0019   0009           00147         retfie
+                      00148 
+                      00149 
+                      00150 ; ----------------------------
+                      00151 ; init PIC & mouse - continued
+                      00152 ; ----------------------------
+                      00153 
+001A                  00154 start_a
+                      00155         movlf   0xff,0x1f
+001A   30FF               M         movlw   0xff
+001B   009F               M         movwf   0x1f
+001C   0185           00156         clrf    PORTA
+001D   0186           00157         clrf    PORTB
+001E   30FF           00158         movlw   b'11111111'
+Warning[224]: Use of this instruction is not recommended.
+001F   0065           00159         tris    PORTA
+Warning[224]: Use of this instruction is not recommended.
+0020   0066           00160         tris    PORTB
+                      00161 
+                      00162 
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00163 ; clear RAM
+                      00164 
+                      00165         movlf   memstart,FSR
+0021   3020               M         movlw   memstart
+0022   0084               M         movwf   FSR
+0023   3C48           00166         sublw   mem_end
+0024   0180           00167 clearam clrf    INDF
+0025   0A84           00168         incf    FSR, F
+0026   3EFF           00169         addlw   0xff
+0027   1D03 2824      00170         bnz     clearam
+                      00171         movlf   TRISB, FSR
+0029   3086               M         movlw   TRISB
+002A   0084               M         movwf   FSR
+                      00172 
+                      00173 ; init variables
+                      00174 
+                      00175         movlf   24,wdtm
+002B   3018               M         movlw   24
+002C   00AB               M         movwf   wdtm
+                      00176         movlf   11,recvc
+002D   300B               M         movlw   11
+002E   00A2               M         movwf   recvc
+                      00177 
+                      00178 ; delay before turn mouse on
+                      00179 
+                      00180         callw   delayms,0
+002F   3000               M         movlw   0
+0030   21D3               M         call    delayms
+                      00181         if      POWER
+                      00182         movlw   b'00001111'     ;turn on mouse
+                      00183         tris    PORTA
+                      00184         callw   delayms,100
+                      00185         movlw   b'00000001'     ;enable pull-up
+                      00186         option
+                      00187         movlf   8,temp1
+                      00188 sla     callw   delayms,0
+                      00189         loop    sla,temp1
+                      00190         endif
+                      00191 
+                      00192 ; wait for mouse
+                      00193 
+0031   1000           00194         bcf     INDF,0          ;inhibit I/O
+0032   1480           00195         bsf     INDF,1
+                      00196         callw   delayms,50
+0033   3032               M         movlw   50
+0034   21D3               M         call    delayms
+                      00197         callw   send,0xE8
+0035   30E8               M         movlw   0xE8
+0036   21A0               M         call    send
+                      00198         callw   send,3
+0037   3003               M         movlw   3
+0038   21A0               M         call    send
+                      00199         callw   send,0xE6
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0039   30E6               M         movlw   0xE6
+003A   21A0               M         call    send
+                      00200         callw   send,0xE6
+003B   30E6               M         movlw   0xE6
+003C   21A0               M         call    send
+                      00201         callw   send,0xE6
+003D   30E6               M         movlw   0xE6
+003E   21A0               M         call    send
+                      00202         callw   send,0xE9
+003F   30E9               M         movlw   0xE9
+0040   21A0               M         call    send
+0041   21C2           00203         call    bwait           ;receive status byte
+0042   21C2           00204         call    bwait           ;receive resolution (value ignored)
+0043   00AD           00205         movwf   temp1           ;0x33
+0044   21C2           00206         call    bwait           ;receive reports per second
+0045   3C55           00207         sublw   0x55
+0046   1D03 284E      00208         bnz     lms
+                      00209         cmplf   0x33,temp1
+0048   3033               M         movlw   0x33
+0049   022D               M         subwf   temp1, W
+004A   1D03 284E      00210         bnz     lms
+004C   153C           00211         bsf     extflags,extnso
+004D   2858           00212         goto    lwheel
+004E   218D           00213 lms     call    testms          ;i.m.explorer compatible?
+004F   1903 2857      00214         bz      lh              ;yes
+0051   3C01           00215         sublw   1               ;intellimouse compatible?
+0052   1D03 2859      00216         bnz     li              ;no
+0054   143C           00217         bsf     extflags,ext200
+0055   218D           00218         call    testms          ;i.m.explorer compatible?
+                      00219         skipnz
+0056   1903               M         btfsc   STATUS, Z
+0057   14BC           00220 lh      bsf     extflags,extime ;i.m.explorer compatible
+0058   17BB           00221 lwheel  bsf     flags,fwheel    ;intellimouse compatible
+                      00222 li      callw   send,0xe8       ;set resolution
+0059   30E8               M         movlw   0xe8
+005A   21A0               M         call    send
+                      00223         callw   send,3          ;8/mm
+005B   3003               M         movlw   3
+005C   21A0               M         call    send
+                      00224         callw   send,0xe6       ;scaling 1:1
+005D   30E6               M         movlw   0xe6
+005E   21A0               M         call    send
+                      00225         callw   send,0xf3       ;set 200fps
+005F   30F3               M         movlw   0xf3
+0060   21A0               M         call    send
+                      00226         callw   send,200
+0061   30C8               M         movlw   200
+0062   21A0               M         call    send
+                      00227         callw   send,0xf4       ;enable mouse in streaming mode
+0063   30F4               M         movlw   0xf4
+0064   21A0               M         call    send
+0065   217D           00228         call    cpoff
+                      00229 
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00230 
+                      00231 ; -----------
+                      00232 ; check mouse
+                      00233 ; -----------
+                      00234 
+                      00235 m_check callw   send,0xE9
+0066   30E9               M         movlw   0xE9
+0067   21A0               M         call    send
+0068   1803 2800      00236         bc      start           ;no response? init mouse again
+006A   3CFA           00237         sublw   0xFA            ;ACK?
+006B   1D03 2800      00238         bnz     start           ;no ACK - init mouse again...
+006D   21C2           00239         call    bwait           ;receive status byte
+006E   1803 2800      00240         bc      start
+0070   3960           00241         andlw   b'01100000'     ;leave only stream & enable flags
+0071   3C20           00242         sublw   b'00100000'     ;must be stream and enabled
+0072   1D03 2800      00243         bnz     start
+0074   1A3B           00244         btfsc   flags,fnores
+0075   2881           00245         goto    p_init
+0076   21C2           00246         call    bwait           ;receive resolution (value ignored)
+0077   1803 287F      00247         bc      nores           ;no resolution...
+0079   1ABB           00248         btfsc   flags,fnofps
+007A   2881           00249         goto    p_init
+007B   21C2           00250         call    bwait           ;receive reports per second
+007C   1803 2880      00251         bc      nofps           ;no fps
+007E   2881           00252         goto    p_init
+                      00253 
+                      00254 ; no resolution & fps report
+                      00255 
+007F   163B           00256 nores   bsf     flags,fnores
+0080   16BB           00257 nofps   bsf     flags,fnofps
+                      00258 
+                      00259 ; ---------------------
+                      00260 ; sync serial port init
+                      00261 ; ---------------------
+                      00262 
+0081                  00263 p_init
+                      00264         movlf   3,recvb
+0081   3003               M         movlw   3
+0082   00A1               M         movwf   recvb
+0083   1BBB           00265         btfsc   flags,fwheel
+0084   0AA1           00266         incf    recvb, F
+0085   01AE           00267         clrf    currbyte
+0086   0800           00268         movfw   INDF
+                      00269         xorfw   PORTB
+0087   0606               M         xorwf   PORTB, W
+0088   3904           00270         andlw   b'00000100'
+0089   1DBC           00271         btfss   extflags,extnof
+                      00272         skipnz
+008A   1903               M         btfsc   STATUS, Z
+008B   2894           00273         goto    plb
+008C   1980           00274         btfsc   INDF,3
+008D   2890           00275         goto    pla
+008E   15BC           00276         bsf     extflags,extnof
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+008F   2894           00277         goto    plb
+0090   133B           00278 pla     bcf     flags,fon       ;mouse off
+                      00279         if      POWER
+                      00280         movlw   b'11101111'     ;XxYy off, power on
+                      00281         tris    PORTA
+                      00282         movlw   b'11111111'     ;buttons and wheels off
+                      00283         else
+0091   30FF           00284         movlw   b'11111111'     ;buttons, wheels, XxYy off
+Warning[224]: Use of this instruction is not recommended.
+0092   0065           00285         tris    PORTA
+                      00286         endif
+Warning[224]: Use of this instruction is not recommended.
+0093   0066           00287         tris    PORTB
+0094   178B           00288 plb     bsf     INTCON,7        ;global interrupt enable
+0095   160B           00289         bsf     INTCON,4        ;enable RB0 interrupt
+                      00290 
+                      00291 
+                      00292 ; check shift flag - byte received
+                      00293 
+0096   1DBB           00294 schk    btfss   flags,fbyte
+0097   28AC           00295         goto    pchk1
+0098   11BB           00296         bcf     flags,fbyte
+0099   082E           00297         movfw   currbyte
+009A   3E3D           00298         addlw   byte1
+009B   0084           00299         movwf   FSR
+                      00300         movff   recvdt,INDF
+009C   0825               M         movf    recvdt, W
+009D   0080               M         movwf   INDF
+                      00301         movlf   TRISB, FSR
+009E   3086               M         movlw   TRISB
+009F   0084               M         movwf   FSR
+00A0   0AAE           00302         incf    currbyte, F
+                      00303         loop    tchk,recvb
+00A1   0BA1               M         decfsz  recvb, F
+00A2   290D               M         goto    tchk
+                      00304         movlf   3,recvb
+00A3   3003               M         movlw   3
+00A4   00A1               M         movwf   recvb
+00A5   1BBB           00305         btfsc   flags,fwheel
+00A6   0AA1           00306         incf    recvb, F
+00A7   01AE           00307         clrf    currbyte
+00A8   143B           00308         bsf     flags,fpkt1
+                      00309         movlf   24,wdtm
+00A9   3018               M         movlw   24
+00AA   00AB               M         movwf   wdtm
+00AB   290D           00310         goto    tchk
+                      00311 
+                      00312 ; check packet flag - packet received
+                      00313 
+00AC   1C3B           00314 pchk1   btfss   flags,fpkt1
+00AD   28C7           00315         goto    pchk2
+00AE   103B           00316         bcf     flags,fpkt1
+00AF   14BB           00317         bsf     flags,fpkt2
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00B0   01B1           00318         clrf    xdir
+00B1   3001           00319         movlw   1
+00B2   1A3D           00320         btfsc   byte1,4
+00B3   30FF           00321         movlw   255
+00B4   08BE           00322         movf    byte2, F
+00B5   1D03           00323         btfss   STATUS,Z
+00B6   00B1           00324         movwf   xdir
+00B7   083E           00325         movfw   byte2
+00B8   1A3D           00326         btfsc   byte1,4
+00B9   3C00           00327         sublw   0
+                      00328         addfw   xdif
+00BA   072F               M         addwf   xdif, W
+00BB   1803           00329         btfsc   STATUS,C
+00BC   30FF           00330         movlw   255
+00BD   00AF           00331         movwf   xdif
+00BE   00B3           00332         movwf   xspeed
+00BF   07B3           00333         addwf   xspeed, F
+                      00334         skipc
+00C0   1C03               M         btfss   STATUS, C
+00C1   07B3           00335         addwf   xspeed, F
+                      00336         skipc
+00C2   1C03               M         btfss   STATUS, C
+00C3   290D           00337         goto    tchk
+                      00338         movlf   255,xspeed
+00C4   30FF               M         movlw   255
+00C5   00B3               M         movwf   xspeed
+00C6   290D           00339         goto    tchk
+                      00340 
+00C7   1CBB           00341 pchk2   btfss   flags,fpkt2
+00C8   28E2           00342         goto    pchk3
+00C9   10BB           00343         bcf     flags,fpkt2
+00CA   153B           00344         bsf     flags,fpkt3
+00CB   01B2           00345         clrf    ydir
+00CC   3001           00346         movlw   1
+00CD   1ABD           00347         btfsc   byte1,5
+00CE   30FF           00348         movlw   255
+00CF   08BF           00349         movf    byte3, F
+00D0   1D03           00350         btfss   STATUS,Z
+00D1   00B2           00351         movwf   ydir
+00D2   083F           00352         movfw   byte3
+00D3   1ABD           00353         btfsc   byte1,5
+00D4   3C00           00354         sublw   0
+                      00355         addfw   ydif
+00D5   0730               M         addwf   ydif, W
+00D6   1803           00356         btfsc   STATUS,C
+00D7   30FF           00357         movlw   255
+00D8   00B0           00358         movwf   ydif
+00D9   00B5           00359         movwf   yspeed
+00DA   07B5           00360         addwf   yspeed, F
+                      00361         skipc
+00DB   1C03               M         btfss   STATUS, C
+00DC   07B5           00362         addwf   yspeed, F
+                      00363         skipc
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00DD   1C03               M         btfss   STATUS, C
+00DE   290D           00364         goto    tchk
+                      00365         movlf   255,yspeed
+00DF   30FF               M         movlw   255
+00E0   00B5               M         movwf   yspeed
+00E1   290D           00366         goto    tchk
+                      00367 
+00E2   1D3B           00368 pchk3   btfss   flags,fpkt3
+00E3   290D           00369         goto    tchk
+00E4   113B           00370         bcf     flags,fpkt3
+                      00371         rlfw    byte1
+00E5   0D3D               M         rlf     byte1, W
+00E6   00AD           00372         movwf   temp1
+00E7   0DAD           00373         rlf     temp1, F
+                      00374         comfw   temp1
+00E8   092D               M         comf    temp1, W
+00E9   391C           00375         andlw   b'00011100'
+                      00376 
+00EA   00AD           00377         movwf   temp1
+00EB   3C1C           00378         sublw   b'00011100'
+                      00379         skipz
+00EC   1D03               M         btfss   STATUS, Z
+00ED   217D           00380         call    cpoff
+00EE   1F3B           00381         btfss   flags,fon
+00EF   290D           00382         goto    p3lc
+00F0   0800           00383         movfw   INDF
+00F1   39E3           00384         andlw   b'11100011'
+                      00385         iorfw   temp1
+00F2   042D               M         iorwf   temp1, W
+00F3   0080           00386         movwf   INDF
+00F4   1FBB           00387         btfss   flags,fwheel
+00F5   290D           00388         goto    p3lc
+00F6   1D3C           00389         btfss   extflags,extnso
+00F7   28FF           00390         goto    p3la
+                      00391         if      POWER
+                      00392         movfw   byte1
+                      00393         andlw   b'11000000'
+                      00394         skipz
+                      00395         bcf     INDF,5
+                      00396         skipnz
+                      00397         bsf     INDF,5
+                      00398         else
+00F8   1B3D           00399         btfsc   byte1,6
+00F9   1280           00400         bcf     INDF,5
+00FA   1F3D           00401         btfss   byte1,6
+00FB   1680           00402         bsf     INDF,5
+00FC   123C           00403         bcf     extflags,extbut
+00FD   1BBD           00404         btfsc   byte1,7
+00FE   163C           00405         bsf     extflags,extbut
+                      00406         endif
+00FF   0840           00407 p3la    movfw   byte4
+0100   1CBC           00408         btfss   extflags,extime
+0101   290C           00409         goto    p3lb
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00410         if      POWER
+                      00411         andlw   b'00110000'
+                      00412         skipz
+                      00413         bcf     INDF,5
+                      00414         skipnz
+                      00415         bsf     INDF,5
+                      00416         movfw   byte4
+                      00417         else
+0102   1AC0           00418         btfsc   byte4,5
+0103   1280           00419         bcf     INDF,5
+0104   1EC0           00420         btfss   byte4,5
+0105   1680           00421         bsf     INDF,5
+0106   123C           00422         bcf     extflags,extbut
+0107   1A40           00423         btfsc   byte4,4
+0108   163C           00424         bsf     extflags,extbut
+                      00425         endif
+0109   390F           00426         andlw   b'00001111'
+010A   19C0           00427         btfsc   byte4,3
+010B   38F0           00428         iorlw   b'11110000'
+010C   07C1           00429 p3lb    addwf   zdif, F
+010D                  00430 p3lc    ;....
+                      00431 
+                      00432 
+                      00433 ; check time to move
+                      00434 
+010D   1F81           00435 tchk    btfss   TMR0,7
+010E   2896           00436         goto    schk
+                      00437         sublf   SPEED,TMR0
+010F   302E               M         movlw   SPEED
+0110   0281               M         subwf   TMR0, F
+                      00438 
+                      00439 ; CPU watchdog
+                      00440 
+0111   0064           00441         clrwdt
+                      00442 
+                      00443 ; check mouse
+                      00444 
+                      00445 mchk    loop    xchk,wdtm+1
+0112   0BAC               M         decfsz  wdtm+1, F
+0113   2926               M         goto    xchk
+                      00446         loop    xchk,wdtm
+0114   0BAB               M         decfsz  wdtm,  F
+0115   2926               M         goto    xchk
+                      00447         movlf   24,wdtm
+0116   3018               M         movlw   24
+0117   00AB               M         movwf   wdtm
+0118   120B           00448         bcf     INTCON,4        ;disable RB0 interrupt
+0119   0821           00449         movfw   recvb
+011A   1BBB           00450         btfsc   flags,fwheel
+011B   3EFF           00451         addlw   255
+011C   3C03           00452         sublw   3               ;packet receive started?
+011D   1D03           00453         btfss   STATUS,Z
+011E   2925           00454         goto    mchk_e          ;yes
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 13
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+011F   0822           00455         movfw   recvc
+0120   3C0B           00456         sublw   11              ;byte receive started?
+0121   1D03           00457         btfss   STATUS,Z
+0122   2925           00458         goto    mchk_e          ;yes
+0123   1806           00459         btfsc   PORTB,0         ;bit receive started?
+0124   2866           00460         goto    m_check         ;no
+0125   160B           00461 mchk_e  bsf     INTCON,4        ;enable RB0 interrupt
+                      00462 
+                      00463 ; check X movement
+                      00464 
+0126   0833           00465 xchk    movfw   xspeed
+0127   07B4           00466         addwf   xspeed+1, F
+0128   1C03           00467         btfss   STATUS,C
+0129   2935           00468         goto    ychk
+012A   08AF           00469         movf    xdif, F
+012B   1903           00470         btfsc   STATUS,Z
+012C   2935           00471         goto    ychk
+012D   03AF           00472         decf    xdif, F
+012E   0831           00473         movfw   xdir
+012F   02B7           00474         subwf   xcount, F
+                      00475         rrfw    xcount
+0130   0C37               M         rrf     xcount, W
+0131   3901           00476         andlw   1
+                      00477         xorfw   xcount
+0132   0637               M         xorwf   xcount, W
+0133   3903           00478         andlw   3
+0134   00B9           00479         movwf   xtemp
+                      00480 
+                      00481 ; check Y movement
+                      00482 
+0135   0835           00483 ychk    movfw   yspeed
+0136   07B6           00484         addwf   yspeed+1, F
+0137   1C03           00485         btfss   STATUS,C
+0138   2944           00486         goto    zchk
+0139   08B0           00487         movf    ydif, F
+013A   1903           00488         btfsc   STATUS,Z
+013B   2944           00489         goto    zchk
+013C   03B0           00490         decf    ydif, F
+013D   0832           00491         movfw   ydir
+013E   07B8           00492         addwf   ycount, F
+                      00493         rrfw    ycount
+013F   0C38               M         rrf     ycount, W
+0140   3901           00494         andlw   1
+                      00495         xorfw   ycount
+0141   0638               M         xorwf   ycount, W
+0142   3903           00496         andlw   3
+0143   00BA           00497         movwf   ytemp
+                      00498 
+                      00499 ; check wheel movement
+                      00500 
+0144                  00501 zchk
+0144   19BC           00502         btfsc   extflags,extnof
+0145   2953           00503         goto    zla
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 14
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00504         if      POWER
+                      00505         btfsc   PORTB,5
+                      00506         goto    zla
+                      00507         btfss   INDF,5
+                      00508         goto    zla
+                      00509         else
+0146   1A05           00510         btfsc   PORTA,4
+0147   2953           00511         goto    zla
+0148   0384           00512         decf    FSR, F
+0149   0800           00513         movfw   INDF
+014A   0A84           00514         incf    FSR, F
+014B   3910           00515         andlw   b'00010000'
+014C   1903           00516         btfsc   STATUS,Z
+014D   2953           00517         goto    zla
+                      00518         endif
+                      00519         movlf   2,zcount
+014E   3002               M         movlw   2
+014F   00C2               M         movwf   zcount
+0150   1700           00520         bsf     INDF,6
+0151   1780           00521         bsf     INDF,7
+0152   01C1           00522         clrf    zdif
+0153   08C1           00523 zla     movf    zdif, F
+0154   1903 2967      00524         bz      xyout
+0156   3001           00525         movlw   1
+0157   1FC1           00526         btfss   zdif,7
+0158   3C00           00527         sublw   0
+0159   07C1           00528         addwf   zdif, F
+015A   07C2           00529         addwf   zcount, F
+                      00530         rrfw    zcount
+015B   0C42               M         rrf     zcount, W
+015C   3901           00531         andlw   1
+                      00532         xorfw   zcount
+015D   0642               M         xorwf   zcount, W
+015E   00AD           00533         movwf   temp1
+015F   0800           00534         movfw   INDF
+0160   393F           00535         andlw   b'00111111'
+0161   182D           00536         btfsc   temp1,0
+0162   3840           00537         iorlw   b'01000000'
+0163   18AD           00538         btfsc   temp1,1
+0164   3880           00539         iorlw   b'10000000'
+0165   1B3B           00540         btfsc   flags,fon
+0166   0080           00541         movwf   INDF
+                      00542 
+                      00543 
+                      00544 ; XY movement out
+                      00545 
+0167   1003           00546 xyout   bcf     STATUS,C
+                      00547         rlfw    xtemp
+0168   0D39               M         rlf     xtemp, W
+                      00548         addfw   xtemp
+0169   0739               M         addwf   xtemp, W
+                      00549         addfw   xtemp
+016A   0739               M         addwf   xtemp, W
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 15
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00550         iorfw   ytemp
+016B   043A               M         iorwf   ytemp, W
+                      00551         if      POWER-1
+016C   1E3C           00552         btfss   extflags,extbut
+016D   3810           00553         iorlw   b'00010000'
+                      00554         endif
+016E   38C0           00555         iorlw   b'11000000'
+016F   1B3B           00556         btfsc   flags,fon
+Warning[224]: Use of this instruction is not recommended.
+0170   0065           00557         tris    PORTA
+                      00558 
+                      00559 ; packet bit shift watchdog
+                      00560 
+0171                  00561 wchk
+                      00562         loop    schk,wdtp
+0171   0BAA               M         decfsz  wdtp,  F
+0172   2896               M         goto    schk
+0173   120B           00563         bcf     INTCON,4        ;disable RB0 interrupt
+0174   08AA           00564         movf    wdtp, F
+0175   1D03           00565         btfss   STATUS,Z
+0176   297B           00566         goto    wla
+                      00567         movlf   11,recvc
+0177   300B               M         movlw   11
+0178   00A2               M         movwf   recvc
+0179   16AA           00568         bsf     wdtp,5
+017A   2881           00569         goto    p_init
+017B   160B           00570 wla     bsf     INTCON,4        ;enable RB0 interrupt
+017C   2896           00571         goto    schk
+                      00572 
+                      00573 
+                      00574 ; check power off
+                      00575 
+017D   1B3B           00576 cpoff   btfsc   flags,fon
+017E   0008           00577         return
+                      00578         comfw   PORTA
+017F   0905               M         comf    PORTA, W
+0180   390F           00579         andlw   b'00001111'
+0181   1903           00580         btfsc   STATUS,Z
+0182   1D06           00581         btfss   PORTB,2
+0183   0008           00582         return
+0184   173B           00583         bsf     flags,fon
+                      00584         movlf   3,xtemp
+0185   3003               M         movlw   3
+0186   00B9               M         movwf   xtemp
+0187   00BA           00585         movwf   ytemp
+                      00586         movlf   2,xcount
+0188   3002               M         movlw   2
+0189   00B7               M         movwf   xcount
+018A   00B8           00587         movwf   ycount
+018B   00C2           00588         movwf   zcount
+018C   0008           00589         return
+                      00590 
+                      00591 ; try to switch to MS-like wheel mode
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 16
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00592 
+                      00593 testms  callw   send,0xf3
+018D   30F3               M         movlw   0xf3
+018E   21A0               M         call    send
+                      00594         callw   send,200
+018F   30C8               M         movlw   200
+0190   21A0               M         call    send
+                      00595         callw   send,0xf3
+0191   30F3               M         movlw   0xf3
+0192   21A0               M         call    send
+0193   3064           00596         movlw   100
+0194   183C           00597         btfsc   extflags,ext200
+0195   30C8           00598         movlw   200
+0196   21A0           00599         call    send
+                      00600         callw   send,0xf3
+0197   30F3               M         movlw   0xf3
+0198   21A0               M         call    send
+                      00601         callw   send,80
+0199   3050               M         movlw   80
+019A   21A0               M         call    send
+                      00602         callw   send,0xF2       ;read mouse ID
+019B   30F2               M         movlw   0xF2
+019C   21A0               M         call    send
+019D   21C2           00603         call    bwait
+019E   3C04           00604         sublw   4
+019F   0008           00605         return
+                      00606 
+                      00607 ; ------------------
+                      00608 ; send byte to mouse
+                      00609 ; ------------------
+                      00610 
+01A0                  00611 send
+01A0   018B           00612         clrf    INTCON
+01A1   00AD           00613         movwf   temp1
+01A2   00A6           00614         movwf   sendata
+01A3   01A7           00615         clrf    sendetc
+01A4   09A7           00616         comf    sendetc, F
+01A5   1000           00617         bcf     INDF,0          ;inhibit I/O
+                      00618         callw   delayus,100
+01A6   3064               M         movlw   100
+01A7   21DC               M         call    delayus
+                      00619         movlf   8,count
+01A8   3008               M         movlw   8
+01A9   00A0               M         movwf   count
+01AA   3001           00620         movlw   1
+01AB   0CAD           00621 s2la    rrf     temp1, F                ;calculate parity
+                      00622         skipnc
+01AC   1803               M         btfsc   STATUS, C
+01AD   06A7           00623         xorwf   sendetc, F
+                      00624         loop    s2la,count
+01AE   0BA0               M         decfsz  count, F
+01AF   29AB               M         goto    s2la
+                      00625         movlf   11,count
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 17
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01B0   300B               M         movlw   11
+01B1   00A0               M         movwf   count
+01B2   1400           00626         bsf     INDF,0
+01B3   1080           00627         bcf     INDF,1          ;initiate send
+01B4   0064           00628 s2lb    clrwdt
+01B5   1806           00629 s2lc    btfsc   PORTB,0         ;wait for 0
+01B6   29B5           00630         goto    s2lc
+01B7   0CA7           00631         rrf     sendetc, F
+01B8   0CA6           00632         rrf     sendata, F
+01B9   1C03           00633         btfss   STATUS,C
+01BA   1080           00634         bcf     INDF,1
+01BB   1803           00635         btfsc   STATUS,C
+01BC   1480           00636         bsf     INDF,1
+01BD   1C06           00637 s2ld    btfss   PORTB,0         ;wait for 1
+01BE   29BD           00638         goto    s2ld
+                      00639         loop    s2lb,count
+01BF   0BA0               M         decfsz  count, F
+01C0   29B4               M         goto    s2lb
+01C1   018B           00640         clrf    INTCON
+                      00641 
+                      00642         ; to be continued
+                      00643 
+                      00644 ; -----------------------
+                      00645 ; receive byte from mouse
+                      00646 ; -----------------------
+                      00647 
+01C2                  00648 bwait
+01C2   178B           00649         bsf     INTCON,7        ;global interrupt enable
+01C3   160B           00650         bsf     INTCON,4        ;enable RB0 interrupt
+                      00651         movlf   40,count
+01C4   3028               M         movlw   40
+01C5   00A0               M         movwf   count
+01C6   0064           00652 bla     clrwdt
+                      00653         callw   delayus,100
+01C7   3064               M         movlw   100
+01C8   21DC               M         call    delayus
+01C9   1DBB           00654         btfss   flags,fbyte
+01CA   29CF           00655         goto    blb
+01CB   11BB           00656         bcf     flags,fbyte
+01CC   0825           00657         movfw   recvdt
+01CD   1003           00658         bcf     STATUS,C
+01CE   0008           00659         return
+                      00660 blb     loop    bla,count
+01CF   0BA0               M         decfsz  count, F
+01D0   29C6               M         goto    bla
+01D1   1403           00661         setc
+01D2   0008           00662         return
+                      00663 
+                      00664 
+                      00665 ; ------
+                      00666 ; delays
+                      00667 ; ------
+                      00668 
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 18
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01D3                  00669 delayms
+01D3   00A0           00670         movwf   count
+01D4   0064           00671 dla     clrwdt
+01D5   30F9           00672         movlw   249
+01D6   3EFF           00673 dlb     addlw   0xff
+01D7   1D03 29D6      00674         bnz     dlb
+                      00675         loop    dla,count
+01D9   0BA0               M         decfsz  count, F
+01DA   29D4               M         goto    dla
+01DB   0008           00676         return
+                      00677 
+                      00678 
+01DC   3EFF           00679 delayus addlw   0xff
+01DD   1D03 29DC      00680         bnz     delayus
+01DF   0008           00681         return
+                      00682 
+01E0   00AD           00683 dprint  movwf   temp1
+01E1   307F           00684         movlw   b'01111111'
+Warning[224]: Use of this instruction is not recommended.
+01E2   0066           00685         tris    PORTB
+01E3   3009           00686         movlw   9
+01E4   00A0           00687         movwf   count
+01E5   0064           00688 dp_a    clrwdt
+01E6   1B06           00689         btfsc   PORTB,6
+01E7   29E5           00690         goto    dp_a
+01E8   307F           00691         movlw   b'01111111'
+01E9   1403           00692         bsf     STATUS,C
+01EA   0DAD           00693         rlf     temp1, F
+01EB   1803           00694         btfsc   STATUS,C
+01EC   30FF           00695         movlw   b'11111111'
+Warning[224]: Use of this instruction is not recommended.
+01ED   0066           00696         tris    PORTB
+01EE   0064           00697 dp_b    clrwdt
+01EF   1F06           00698         btfss   PORTB,6
+01F0   29EE           00699         goto    dp_b
+01F1   0BA0           00700         decfsz  count, F
+01F2   29E5           00701         goto    dp_a
+01F3   0008           00702         return
+                      00703 
+                      00704         end
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 19
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ADDEN                             00000003
+ADEN                              00000003
+BRGH                              00000002
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCPR1                             00000015
+CCPR1H                            00000016
+CCPR1L                            00000015
+CIS                               00000003
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000001F
+CMIE                              00000006
+CMIF                              00000006
+CREN                              00000004
+CSRC                              00000007
+DATA_CP_OFF                       00003FFF
+DATA_CP_ON                        00003EFF
+DC                                00000001
+EEADR                             0000009B
+EECON1                            0000009C
+EECON2                            0000009D
+EEDATA                            0000009A
+EEIE                              00000007
+EEIF                              00000007
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GIE                               00000007
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+NOT_BO                            00000000
+NOT_BOD                           00000000
+NOT_BOR                           00000000
+NOT_PD                            00000003
+NOT_POR                           00000001
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 20
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+NOT_RBPU                          00000007
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+OERR                              00000001
+OPTION_REG                        00000081
+OSCF                              00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PIE1                              0000008C
+PIR1                              0000000C
+PORTA                             00000005
+PORTB                             00000006
+POWER                             00000000
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+RA0                               00000000
+RA1                               00000001
+RA2                               00000002
+RA3                               00000003
+RA4                               00000004
+RA5                               00000005
+RA6                               00000006
+RA7                               00000007
+RB0                               00000000
+RB1                               00000001
+RB2                               00000002
+RB3                               00000003
+RB4                               00000004
+RB5                               00000005
+RB6                               00000006
+RB7                               00000007
+RBIE                              00000003
+RBIF                              00000000
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+RX9                               00000006
+RX9D                              00000000
+SPBRG                             00000099
+SPEED                             0000002E
+SPEN                              00000007
+SREN                              00000005
+STATUS                            00000003
+SYNC                              00000004
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 21
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1OSCEN                           00000003
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR1                              0000000E
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISA0                            00000000
+TRISA1                            00000001
+TRISA2                            00000002
+TRISA3                            00000003
+TRISA4                            00000004
+TRISA5                            00000005
+TRISA6                            00000006
+TRISA7                            00000007
+TRISB                             00000086
+TRISB0                            00000000
+TRISB1                            00000001
+TRISB2                            00000002
+TRISB3                            00000003
+TRISB4                            00000004
+TRISB5                            00000005
+TRISB6                            00000006
+TRISB7                            00000007
+TRMT                              00000001
+TX9                               00000006
+TX9D                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 22
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+TXREG                             00000019
+TXSTA                             00000098
+VR0                               00000000
+VR1                               00000001
+VR2                               00000002
+VR3                               00000003
+VRCON                             0000009F
+VREN                              00000007
+VROE                              00000006
+VRR                               00000005
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_BOREN_OFF                        00003FBF
+_BOREN_ON                         00003FFF
+_CONFIG                           00002007
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_OFF                           00003FFF
+_CP_ON                            00001FFF
+_DEVID1                           00002006
+_ER_OSC_CLKOUT                    00003FFF
+_ER_OSC_NOCLKOUT                  00003FFE
+_EXTCLK_OSC                       00003FEF
+_FOSC_ECIO                        00003FEF
+_FOSC_EXTRCCLK                    00003FFF
+_FOSC_EXTRCIO                     00003FFE
+_FOSC_HS                          00003FEE
+_FOSC_INTOSCCLK                   00003FFD
+_FOSC_INTOSCIO                    00003FFC
+_FOSC_LP                          00003FEC
+_FOSC_XT                          00003FED
+_HS_OSC                           00003FEE
+_IDLOC0                           00002000
+_IDLOC1                           00002001
+_IDLOC2                           00002002
+_IDLOC3                           00002003
+_INTOSC_OSC_CLKOUT                00003FFD
+_INTOSC_OSC_NOCLKOUT              00003FFC
+_INTRC_OSC_CLKOUT                 00003FFD
+_INTRC_OSC_NOCLKOUT               00003FFC
+_LP_OSC                           00003FEC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_MCLRE_OFF                        00003FDF
+_MCLRE_ON                         00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC_CLKOUT                    00003FFF
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 23
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_RC_OSC_NOCLKOUT                  00003FFE
+_WDTE_OFF                         00003FFB
+_WDTE_ON                          00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_XT_OSC                           00003FED
+__16F628A                         00000001
+addfw                             
+bla                               000001C6
+blb                               000001CF
+bwait                             000001C2
+byte1                             0000003D
+byte2                             0000003E
+byte3                             0000003F
+byte4                             00000040
+callw                             
+clearam                           00000024
+cmplf                             
+comfw                             
+count                             00000020
+cpoff                             0000017D
+currbyte                          0000002E
+delayms                           000001D3
+delayus                           000001DC
+dla                               000001D4
+dlb                               000001D6
+dp_a                              000001E5
+dp_b                              000001EE
+dprint                            000001E0
+ext200                            00000000
+extbut                            00000004
+extflags                          0000003C
+extime                            00000001
+extnof                            00000003
+extnso                            00000002
+fbyte                             00000003
+flags                             0000003B
+fnofps                            00000005
+fnores                            00000004
+fon                               00000006
+fpkt1                             00000000
+fpkt2                             00000001
+fpkt3                             00000002
+fwheel                            00000007
+ila                               00000015
+int                               00000004
+ints                              00000029
+intw                              00000028
+iorfw                             
+lh                                00000057
+li                                00000059
+lms                               0000004E
+loop                              
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 24
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+lwheel                            00000058
+m_check                           00000066
+mchk                              00000112
+mchk_e                            00000125
+mem_end                           00000048
+memstart                          00000020
+movff                             
+movlf                             
+nofps                             00000080
+nores                             0000007F
+p3la                              000000FF
+p3lb                              0000010C
+p3lc                              0000010D
+p_init                            00000081
+pchk1                             000000AC
+pchk2                             000000C7
+pchk3                             000000E2
+pla                               00000090
+plb                               00000094
+q0                                00000043
+q1                                00000044
+q2                                00000045
+q3                                00000046
+q4                                00000047
+recvb                             00000021
+recvc                             00000022
+recvd                             00000023
+recvdt                            00000025
+rlfw                              
+rrfw                              
+s2la                              000001AB
+s2lb                              000001B4
+s2lc                              000001B5
+s2ld                              000001BD
+schk                              00000096
+send                              000001A0
+sendata                           00000026
+sendetc                           00000027
+skipc                             
+skipnc                            
+skipnz                            
+skipz                             
+start                             00000000
+start_a                           0000001A
+sublf                             
+swapfw                            
+tchk                              0000010D
+temp1                             0000002D
+testms                            0000018D
+wchk                              00000171
+wdtm                              0000002B
+wdtp                              0000002A
+wla                               0000017B
+MPASM 5.57                /TMP/PS2M/PS2M.ASM   4-22-2016  10:11:08         PAGE 25
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+xchk                              00000126
+xcount                            00000037
+xdif                              0000002F
+xdir                              00000031
+xorfw                             
+xspeed                            00000033
+xtemp                             00000039
+xyout                             00000167
+ychk                              00000135
+ycount                            00000038
+ydif                              00000030
+ydir                              00000032
+yspeed                            00000035
+ytemp                             0000003A
+zchk                              00000144
+zcount                            00000042
+zdif                              00000041
+zla                               00000153
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+00C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0100 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0140 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0180 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+01C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXX------------
+2000 : -------X-------- ---------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   500
+Program Memory Words Free:  1548
+
+
+Errors   :     0
+Warnings :     8 reported,     0 suppressed
+Messages :     0 reported,     0 suppressed
+
+
